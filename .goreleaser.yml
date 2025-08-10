@@ -1,0 +1,111 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+#
+# requires cross-compilation docker image:
+# https://github.com/goreleaser/goreleaser-cross/pkgs/container/goreleaser-cross
+version: 2
+
+project_name: lrag
+dist: .builds
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: app
+    main: ./cmd/cli/main.go
+    mod_timestamp: "{{.CommitTimestamp}}"
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{.Version}} -X main.build={{.Commit}} -X main.date={{.CommitTimestamp}}"
+      - '-linkmode external -extldflags "-static -Wl,-unresolved-symbols=ignore-all"'
+    goos:
+      - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ignore:
+      - goos: windows
+        goarch: arm64
+    env:
+      - CGO_ENABLED=1
+      - CC=x86_64-linux-gnu-gcc
+      - CXX=x86_64-linux-gnu-g++
+    overrides:
+      - goos: linux
+        goarch: arm64
+        env:
+          - CGO_ENABLED=1
+          - CC=aarch64-linux-gnu-gcc
+          - CXX=aarch64-linux-gnu-g++
+      - goos: windows
+        goarch: amd64
+        ldflags:
+          - "-s -w"
+          - "-X main.version={{.Version}} -X main.build={{.Commit}} -X main.date={{.CommitTimestamp}}"
+        env:
+          - CGO_ENABLED=1
+          - CC=x86_64-w64-mingw32-gcc
+          - CXX=x86_64-w64-mingw32-g++
+      - goos: darwin
+        goarch: arm64
+        ldflags:
+          - "-s -w"
+          - "-X main.version={{.Version}} -X main.build={{.Commit}} -X main.date={{.CommitTimestamp}}"
+        env:
+          - CGO_ENABLED=1
+          - CC=o64-clang
+          - CXX=o64-clang++
+      - goos: darwin
+        goarch: amd64
+        ldflags:
+          - "-s -w"
+          - "-X main.version={{.Version}} -X main.build={{.Commit}} -X main.date={{.CommitTimestamp}}"
+        env:
+          - CGO_ENABLED=1
+          - CC=oa64-clang
+          - CXX=oa64-clang++
+
+snapshot:
+  version_template: "{{incpatch .Version}}-next"
+
+metadata:
+  mod_timestamp: "{{.CommitTimestamp}}"
+
+git:
+  prerelease_suffix: "-"
+  ignore_tags:
+    - nightly
+    - dev
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  draft: true
+  replace_existing_draft: true
+  prerelease: auto
+
+archives:
+  - id: archive_app
+    ids: [app]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: ["zip"]
+    files:
+      - LICENSE
+      - CHANGELOG.md
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^dev"
+      - "^test"
+      - "^ops"
+      - "^build"
+      - "^chore"
+      - "^style"

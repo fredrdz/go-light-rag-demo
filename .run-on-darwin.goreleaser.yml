@@ -1,0 +1,100 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: lrag
+dist: .builds
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: app
+    main: ./cmd/cli/main.go
+    mod_timestamp: "{{.CommitTimestamp}}"
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{.Version}} -X main.build={{.Commit}} -X main.date={{.CommitTimestamp}}"
+    goos:
+      - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ignore:
+      - goos: windows
+        goarch: arm64
+    env:
+      - CGO_ENABLED=1
+      - CC=clang
+      - CXX=clang++
+    overrides:
+      - goos: windows
+        goarch: amd64
+        env:
+          - CGO_ENABLED=1
+          - CC=x86_64-w64-mingw32-gcc
+          - CXX=x86_64-w64-mingw32-g++
+      - goos: linux
+        goarch: amd64
+        ldflags:
+          - "-s -w"
+          - "-X main.version={{.Version}} -X main.build={{.Commit}} -X main.date={{.CommitTimestamp}}"
+          - '-linkmode external -extldflags "-static -Wl,-unresolved-symbols=ignore-all"'
+        env:
+          - CGO_ENABLED=1
+          - CC=x86_64-linux-musl-gcc
+          - CXX=x86_64-linux-musl-g++
+      - goos: linux
+        goarch: arm64
+        ldflags:
+          - "-s -w"
+          - "-X main.version={{.Version}} -X main.build={{.Commit}} -X main.date={{.CommitTimestamp}}"
+          - '-linkmode external -extldflags "-static -Wl,-unresolved-symbols=ignore-all"'
+        env:
+          - CGO_ENABLED=1
+          - CC=aarch64-linux-musl-gcc
+          - CXX=aarch64-linux-musl-g++
+
+snapshot:
+  version_template: "{{incpatch .Version}}-next"
+
+metadata:
+  mod_timestamp: "{{.CommitTimestamp}}"
+
+git:
+  prerelease_suffix: "-"
+  ignore_tags:
+    - nightly
+    - dev
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  draft: true
+  replace_existing_draft: true
+  prerelease: auto
+
+archives:
+  - id: archive_app
+    ids: [app]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: ["zip"]
+    files:
+      - LICENSE
+      - CHANGELOG.md
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^dev"
+      - "^test"
+      - "^ops"
+      - "^build"
+      - "^chore"
+      - "^style"
